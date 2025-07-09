@@ -1,0 +1,182 @@
+C++ ile Ağ Trafiği Modelleme ve 5G Simülasyonu
+C++, yüksek performanslı ağ simülasyonları ve teorik modellemeler için idealdir. NS-3, OMNeT++, ve Boost.Asio gibi araçlarla 5G odaklı çalışmalar yapabilirsiniz. İşte adım adım bir rehber:
+
+1. NS-3 ile 5G Simülasyonu (C++ Tabanlı)
+NS-3, C++ ve Python API'leri sunan bir ağ simülatörüdür. 5G özelliklerini 5G-LENA modülüyle destekler.
+
+Örnek: Basit 5G Hücresel Ağ Modeli
+cpp
+// Örnek NS-3 kodu (5G-LENA modülü gerektirir)
+#include "ns3/core-module.h"
+#include "ns3/network-module.h"
+#include "ns3/mobility-module.h"
+#include "ns3/5g-lena-module.h" // 5G için özel modül
+
+using namespace ns3;
+
+int main() {
+    // 1. Temel sistem ayarları
+    Config::SetDefault("ns3::LteEnbNetDevice::DlBandwidth", UintegerValue(50)); // 50 MHz bant genişliği
+    Config::SetDefault("ns3::LteEnbNetDevice::UlBandwidth", UintegerValue(50));
+
+    // 2. Düğümleri (Node) oluştur
+    NodeContainer ueNodes; // Kullanıcı ekipmanları (UE)
+    NodeContainer enbNodes; // Baz istasyonları (eNB)
+    ueNodes.Create(10);    // 10 UE
+    enbNodes.Create(1);    // 1 eNB
+
+    // 3. Konumlandırma (Mobility)
+    MobilityHelper mobility;
+    mobility.SetPositionAllocator("ns3::UniformDiscPositionAllocator",
+                                "X", DoubleValue(0.0),
+                                "Y", DoubleValue(0.0),
+                                "Rho", DoubleValue(100.0)); // 100m yarıçap
+    mobility.Install(ueNodes);
+
+    // 4. 5G protokollerini yükle
+    Ptr<LteHelper> lteHelper = CreateObject<LteHelper>();
+    lteHelper->SetAttribute("PathlossModel", StringValue("ns3::Hybrid3gppPropagationLossModel"));
+
+    // 5. Ağ kurulumu
+    NetDeviceContainer enbDevs = lteHelper->InstallEnbDevice(enbNodes);
+    NetDeviceContainer ueDevs = lteHelper->InstallUeDevice(ueNodes);
+
+    // 6. Simülasyonu çalıştır
+    Simulator::Stop(Seconds(10.0));
+    Simulator::Run();
+    Simulator::Destroy();
+
+    return 0;
+}
+Ne Yaptık?
+10 kullanıcı (UE) ve 1 baz istasyonu (eNB) oluşturduk.
+
+5G protokollerini ve radyo yayılım modelini ayarladık.
+
+10 saniyelik bir simülasyon çalıştırdık.
+
+Nasıl Çalıştırılır?
+NS-3 ve 5G-LENA modülünü kurun (GitHub).
+
+Kodu .cc uzantılı dosyaya kaydedip NS-3'ün waf build sistemi ile derleyin:
+
+bash
+./waf --run örnek-kod
+2. Boost.Asio ile Gerçekçi Trafik Üretme
+5G'deki düşük gecikmeli iletişimi test etmek için Boost.Asio kullanabilirsiniz.
+
+Örnek: UDP ile Düşük Gecikmeli Mesajlaşma
+cpp
+#include <boost/asio.hpp>
+#include <iostream>
+
+using namespace boost::asio;
+using ip::udp;
+
+void server() {
+    io_context io;
+    udp::socket socket(io, udp::endpoint(udp::v4(), 1234));
+    char buffer[1024];
+    udp::endpoint remote_endpoint;
+
+    while (true) {
+        size_t length = socket.receive_from(buffer(buffer, 1024), remote_endpoint);
+        std::cout << "Alınan veri: " << std::string(buffer, length) << std::endl;
+    }
+}
+
+void client() {
+    io_context io;
+    udp::socket socket(io, udp::endpoint(udp::v4(), 0));
+    udp::endpoint server_endpoint(ip::address::from_string("127.0.0.1"), 1234);
+
+    for (int i = 0; i < 100; ++i) {
+        std::string message = "5G test mesajı " + std::to_string(i);
+        socket.send_to(buffer(message), server_endpoint);
+    }
+}
+
+int main() {
+    std::thread(server).detach(); // Sunucuyu thread'de çalıştır
+    client(); // İstemciyi başlat
+    return 0;
+}
+Ne Yaptık?
+UDP tabanlı bir sunucu-istemci iletişimi kurduk.
+
+100 adet test mesajı gönderdik.
+
+Nasıl Çalıştırılır?
+bash
+g++ -std=c++17 -I/path/to/boost örnek.cpp -lboost_system -lpthread
+./a.out
+3. Matematiksel Modelleme (C++ ile)
+5G'deki kuyruk teorisi (Queueing Theory) veya radyo yayılım modellerini C++ ile implemente edebilirsiniz.
+
+Örnek: Kuyruk Modeli (M/M/1)
+cpp
+#include <iostream>
+#include <random>
+#include <queue>
+
+double simulateMM1Queue(double arrivalRate, double serviceRate, int totalPackets) {
+    std::queue<double> packetQueue;
+    std::default_random_engine generator;
+    std::exponential_distribution<double> arrival(arrivalRate);
+    std::exponential_distribution<double> service(serviceRate);
+
+    double currentTime = 0;
+    double totalDelay = 0;
+
+    for (int i = 0; i < totalPackets; ++i) {
+        double interArrival = arrival(generator);
+        currentTime += interArrival;
+        packetQueue.push(currentTime);
+
+        if (packetQueue.size() == 1) {
+            double serviceTime = service(generator);
+            totalDelay += serviceTime;
+        }
+    }
+
+    return totalDelay / totalPackets;
+}
+
+int main() {
+    double avgDelay = simulateMM1Queue(0.5, 1.0, 10000); // λ=0.5, μ=1.0
+    std::cout << "Ortalama gecikme: " << avgDelay << " saniye" << std::endl;
+    return 0;
+}
+Ne Yaptık?
+Poisson süreciyle gelen paketlerin ortalama gecikmesini hesapladık.
+
+M/M/1 kuyruk modeli kullanıldı.
+
+4. Hangi Kütüphaneleri Kullanmalıyım?
+Amaç	Kütüphane
+Ağ Simülasyonu	NS-3, OMNeT++
+Gerçek Zamanlı Ağ İletişimi	Boost.Asio
+Matematiksel Modelleme	Eigen (Lineer Cebir), GNU Scientific Library (GSL)
+Veri Görselleştirme	Gnuplot (C++ bağlayıcıları var)
+5. Tez Çalışmasına Entegrasyon
+Modeli Tanımla:
+
+"5G'deki kuyruk gecikmesi M/M/1 modeliyle modellenmiştir."
+
+Kodu Ekleyin:
+
+GitHub repo'suna koyup tezde referans verin.
+
+Sonuçları Analiz Edin:
+
+"NS-3 simülasyonunda 10ms'lik gecikme elde edildi."
+
+Sonuç
+NS-3 ile 5G protokollerini simüle edebilirsiniz.
+
+Boost.Asio ile gerçekçi trafik üretebilirsiniz.
+
+C++ + Eigen/GSL ile matematiksel modeller geliştirebilirsiniz.
+
+Başlamak için NS-3 + 5G-LENA modülünü kurup basit bir hücresel ağ simülasyonu yapın. Tezinizde hem kod hem de teorik analiz bir arada olmalıdır. 🚀
+
